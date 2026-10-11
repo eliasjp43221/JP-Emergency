@@ -1,0 +1,35 @@
+name: Android CI — Verify & Upload APK Artifact
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-apk:
+    name: Verify & Upload Jamalpur Sheba APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Verify APK Exists in Repository
+        run: |
+          if [ ! -f "apk/jamalpur-sheba.apk" ]; then
+            echo "ত্রুটি: apk/jamalpur-sheba.apk ফাইলটি পাওয়া যায়নি!"
+            exit 1
+          fi
+          ls -lh apk/jamalpur-sheba.apk
+
+      - name: Upload Downloadable APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jamalpur-sheba-apk
+          path: apk/jamalpur-sheba.apk
+          if-no-files-found: error

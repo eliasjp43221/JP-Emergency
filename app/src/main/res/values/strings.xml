@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">জামালপুর সেবা</string>
+    <string name="app_subtitle">আপনার প্রয়োজনীয় সেবা, এক জায়গায়</string>
+    <string name="app_english_subtitle">Jamalpur District Emergency &amp; Public Services</string>
+    <string name="search_placeholder">হাসপাতাল, অ্যাম্বুলেন্স, থানা বা সেবা খুঁজুন...</string>
+    <string name="clear_search">মুছুন</string>
+    <string name="no_results_title">কোনো ফলাফল পাওয়া যায়নি</string>
+    <string name="no_results_subtitle">অনুগ্রহ করে বানান পরীক্ষা করুন অথবা অন্য কোনো শব্দ বা উপজেলা নির্বাচন করে আবার চেষ্টা করুন।</string>
+    <string name="emergency_999_title">জাতীয় জরুরি সেবা — ৯৯৯</string>
+    <string name="emergency_999_desc">পুলিশ, ফায়ার সার্ভিস ও অ্যাম্বুলেন্স (২৪ ঘণ্টা টোল-ফ্রি)</string>
+    <string name="emergency_102_title">ফায়ার সার্ভিস — ১০২</string>
+    <string name="emergency_102_desc">অগ্নিকাণ্ড ও জরুরি উদ্ধার সহায়তা হটলাইন</string>
+    <string name="nav_home">হোম</string>
+    <string name="nav_services">সেবাসমূহ</string>
+    <string name="nav_favorites">প্রিয়</string>
+    <string name="nav_settings">সেটিংস</string>
+    <string name="action_call">কল করুন</string>
+    <string name="action_map">ম্যাপে দেখুন</string>
+    <string name="action_share">তথ্য শেয়ার করুন</string>
+    <string name="action_report">তথ্যে সমস্যা জানান</string>
+    <string name="status_verified">যাচাইকৃত</string>
+    <string name="status_reverify">পুনরায় যাচাই প্রয়োজন</string>
+    <string name="status_incomplete">তথ্য অসম্পূর্ণ</string>
+    <string name="offline_ready_badge">অফলাইন ডিরেক্টরি সক্রিয় — ইন্টারনেট ছাড়াই সকল সংরক্ষিত তথ্য ব্যবহারযোগ্য</string>
+</resources>

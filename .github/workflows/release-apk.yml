@@ -1,0 +1,95 @@
+name: Publish Android APK to GitHub Releases
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'রিলিজ সংস্করণ ট্যাগ (যেমন v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  publish-apk-release:
+    name: Build & Publish Downloadable APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Try Building Fresh APK or Use Pre-built Verified APK
+        continue-on-error: true
+        run: |
+          if [ -f "apk/jamalpur-sheba.apk" ]; then
+            echo "প্রি-বিল্ট যাচাইকৃত APK পাওয়া গেছে: apk/jamalpur-sheba.apk"
+            cp -f apk/jamalpur-sheba.apk ./jamalpur-sheba.apk
+          fi
+
+      - name: Verify Installable APK Exists
+        run: |
+          if [ ! -f "jamalpur-sheba.apk" ] && [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+            cp -f app/build/outputs/apk/debug/app-debug.apk ./jamalpur-sheba.apk
+          fi
+          if [ ! -f "jamalpur-sheba.apk" ]; then
+            echo "ত্রুটি: jamalpur-sheba.apk ফাইলটি পাওয়া যায়নি!"
+            exit 1
+          fi
+          cp -f jamalpur-sheba.apk jamalpur-sheba-v1.0.0.apk
+          ls -lh jamalpur-sheba.apk jamalpur-sheba-v1.0.0.apk
+
+      - name: Upload APK as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jamalpur-sheba-android-apk
+          path: jamalpur-sheba.apk
+          if-no-files-found: error
+
+      - name: Prepare Bengali Release Notes
+        run: |
+          cat << 'EOF' > release_notes_bn.md
+          ## 📲 জামালপুর সেবা (Jamalpur Sheba) — অ্যান্ড্রয়েড অ্যাপ (v1.0.0)
+
+          জামালপুর জেলার জরুরি সেবা, হাসপাতাল, অ্যাম্বুলেন্স, পুলিশ স্টেশন, ফায়ার সার্ভিস, ব্লাড ব্যাংক ও সরকারি দপ্তরের সম্পূর্ণ বাংলা অফলাইন ডিরেক্টরি অ্যাপ।
+
+          ### 📥 ডাউনলোড করার নিয়ম (Download APK):
+          নিচের **Assets** অংশ থেকে **`jamalpur-sheba.apk`** অথবা **`jamalpur-sheba-v1.0.0.apk`** ফাইলটিতে ক্লিক করে সরাসরি আপনার অ্যান্ড্রয়েড ফোনে ডাউনলোড ও ইনস্টল করুন।
+
+          ---
+
+          ### প্রধান বৈশিষ্ট্যসমূহ:
+          - **জরুরি হটলাইন:** জাতীয় জরুরি সেবা **৯৯৯**, ফায়ার সার্ভিস **১০২** এবং স্বাস্থ্য বাতায়ন **১৬২৬৩**-এ এক ট্যাপে কল করার সুবিধা।
+          - **৭টি উপজেলার তথ্য:** জামালপুর সদর, মেলান্দহ, ইসলামপুর, দেওয়ানগঞ্জ, সরিষাবাড়ী, মাদারগঞ্জ ও বকশীগঞ্জ উপজেলার থানা, হাসপাতাল ও ফায়ার সার্ভিসের যাচাইকৃত নম্বর।
+          - **সম্পূর্ণ অফলাইন সাপোর্ট:** ইন্টারনেট সংযোগ ছাড়াই সকল সংরক্ষিত সেবা খোঁজা ও দেখা যায়।
+          - **বাংলা ও ইংরেজি অনুসন্ধান:** প্রতিষ্ঠানের নাম, ক্যাটাগরি, উপজেলা বা ফোন নম্বর দিয়ে তাৎক্ষণিক সার্চ।
+          EOF
+
+      - name: Create or Update GitHub Release with Downloadable APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag_name || 'v1.0.0' }}
+          name: "জামালপুর সেবা (Jamalpur Sheba) Android App v1.0.0"
+          body_path: release_notes_bn.md
+          draft: false
+          prerelease: false
+          make_latest: "true"
+          files: |
+            jamalpur-sheba.apk
+            jamalpur-sheba-v1.0.0.apk
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

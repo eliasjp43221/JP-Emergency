@@ -1,0 +1,6 @@
+{
+  "name": "জামালপুর সেবা",
+  "description": "জামালপুর জেলার জরুরি সেবা, হাসপাতাল, অ্যাম্বুলেন্স, পুলিশ, ফায়ার সার্ভিস ও জনগুরুত্বপূর্ণ তথ্যের সমন্বিত অফলাইন ডিরেক্টরি অ্যাপ (Jamalpur District Emergency & Public Services)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

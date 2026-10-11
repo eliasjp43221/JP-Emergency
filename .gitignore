@@ -1,0 +1,23 @@
+*.iml
+.gradle
+.kotlin
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+.env
+debug.keystore
+*.jks
+
+# গিটহাবে সরাসরি ডাউনলোডের জন্য apk ফোল্ডার ট্র্যাক করা হচ্ছে
+!/apk/
+!/apk/*.apk
