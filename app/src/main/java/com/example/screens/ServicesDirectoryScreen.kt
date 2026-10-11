@@ -26,7 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bloodtype
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.FilterAltOff
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -40,7 +39,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -78,7 +76,6 @@ fun ServicesDirectoryScreen(
     onDisableNearbySort: () -> Unit,
     onLocationDeniedMessage: (String) -> Unit,
     onOpenBloodDonors: () -> Unit,
-    onOpenDataUpdate: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -122,7 +119,7 @@ fun ServicesDirectoryScreen(
         contentPadding = PaddingValues(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
+        item(key = "dir_header", contentType = "header") {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -148,7 +145,7 @@ fun ServicesDirectoryScreen(
                         .fillMaxWidth()
                         .testTag("directory_search_input"),
                     placeholder = {
-                        Text("প্রতিষ্ঠানের নাম, নম্বর, থানা বা ঠিকানা লিখুন...")
+                        Text("প্রতিষ্ঠানের নাম, কলেজ, সরকারি অফিস, নম্বর বা ঠিকানা লিখুন...")
                     },
                     leadingIcon = {
                         Icon(
@@ -176,14 +173,19 @@ fun ServicesDirectoryScreen(
         }
 
         // Category Filter Row
-        item {
+        item(key = "dir_category_row", contentType = "category_row") {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.testTag("category_filter_row")
             ) {
-                items(ServiceCategory.entries, key = { it.id }) { category ->
+                items(
+                    items = ServiceCategory.entries,
+                    key = { it.id },
+                    contentType = { "category_chip" }
+                ) { category ->
                     val isSelected = uiState.selectedCategory == category
+                    val icon = remember(category) { CategoryIconHelper.getIcon(category) }
                     FilterChip(
                         selected = isSelected,
                         onClick = { onSelectCategory(category) },
@@ -195,7 +197,7 @@ fun ServicesDirectoryScreen(
                         },
                         leadingIcon = {
                             Icon(
-                                imageVector = CategoryIconHelper.getIcon(category),
+                                imageVector = icon,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -206,16 +208,14 @@ fun ServicesDirectoryScreen(
                             selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
                         ),
                         shape = CircleShape,
-                        modifier = Modifier
-                            .minimumInteractiveComponentSize()
-                            .testTag("category_chip_${category.id}")
+                        modifier = Modifier.testTag("category_chip_${category.id}")
                     )
                 }
             }
         }
 
         // Upazila Filter Row
-        item {
+        item(key = "dir_upazila_row", contentType = "upazila_row") {
             UpazilaFilterRow(
                 selectedUpazila = uiState.selectedUpazila,
                 onSelectUpazila = onSelectUpazila,
@@ -224,7 +224,7 @@ fun ServicesDirectoryScreen(
         }
 
         // Nearby Sort & Filter Status Bar
-        item {
+        item(key = "dir_status_bar", contentType = "status_bar") {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -302,7 +302,7 @@ fun ServicesDirectoryScreen(
 
         // Special banner when Blood Donor category is selected
         if (uiState.selectedCategory == ServiceCategory.BLOOD_DONOR) {
-            item {
+            item(key = "blood_donor_banner", contentType = "banner") {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -310,7 +310,8 @@ fun ServicesDirectoryScreen(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer
                     ),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(14.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -345,33 +346,21 @@ fun ServicesDirectoryScreen(
         }
 
         if (uiState.filteredServices.isEmpty()) {
-            item {
-                val categoryCount = uiState.categoryCounts[uiState.selectedCategory] ?: 0
-                if (uiState.selectedCategory != ServiceCategory.ALL && categoryCount == 0 && uiState.searchQuery.isBlank()) {
-                    // Honest explanation when a category has no verified entries yet (Verified Data Policy)
-                    CategoryPendingVerificationCard(
-                        category = uiState.selectedCategory,
-                        onOpenDataUpdate = onOpenDataUpdate,
-                        onResetCategory = { onSelectCategory(ServiceCategory.ALL) },
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp)
-                            .testTag("category_pending_verification_card")
-                    )
-                } else {
-                    EmptySearchResultCard(
-                        query = uiState.searchQuery,
-                        upazila = uiState.selectedUpazila,
-                        onReset = onResetFilters,
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp)
-                            .testTag("directory_empty_state")
-                    )
-                }
+            item(key = "dir_empty_state", contentType = "empty_state") {
+                EmptySearchResultCard(
+                    query = uiState.searchQuery,
+                    upazila = uiState.selectedUpazila,
+                    onReset = onResetFilters,
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .testTag("directory_empty_state")
+                )
             }
         } else {
             items(
                 items = uiState.filteredServices,
-                key = { it.id }
+                key = { it.id },
+                contentType = { "service_card" }
             ) { entry ->
                 val distKm = if (uiState.isNearbySortActive && uiState.userLat != null && uiState.userLng != null) {
                     val lat = entry.latitude ?: entry.upazila.centerLat
@@ -394,54 +383,6 @@ fun ServicesDirectoryScreen(
                     distanceKm = distKm,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CategoryPendingVerificationCard(
-    category: ServiceCategory,
-    onOpenDataUpdate: () -> Unit,
-    onResetCategory: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-        ),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "${category.titleBn} — যাচাইকৃত তথ্য নীতিমালা",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-            Text(
-                text = "জামালপুর সেবা অ্যাপে কোনো কাল্পনিক প্রতিষ্ঠান বা যাচাইবিহীন ফোন নম্বর প্রদর্শন করা হয় না। এই বিভাগে সরকারি বা প্রাতিষ্ঠানিক সূত্র থেকে যাচাইকৃত নতুন নম্বরসমূহ JSON ডাটা আপডেট সিস্টেমের মাধ্যমে যুক্ত করা যাবে।",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = onOpenDataUpdate) {
-                    Text("JSON ডাটা ইমপোর্ট করুন")
-                }
-                OutlinedButton(onClick = onResetCategory) {
-                    Text("সকল সেবা দেখুন")
-                }
             }
         }
     }

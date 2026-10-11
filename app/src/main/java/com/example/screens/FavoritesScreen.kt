@@ -116,7 +116,8 @@ fun FavoritesScreen(
         } else {
             items(
                 items = uiState.favoriteServices,
-                key = { "fav_${it.id}" }
+                key = { "fav_${it.id}" },
+                contentType = { "service_card" }
             ) { entry ->
                 ServiceCardComponent(
                     entry = entry,
@@ -128,7 +129,7 @@ fun FavoritesScreen(
         }
 
         if (uiState.recentlyViewedServices.isNotEmpty()) {
-            item {
+            item(key = "recent_history_header", contentType = "header") {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -165,7 +166,8 @@ fun FavoritesScreen(
 
             items(
                 items = uiState.recentlyViewedServices,
-                key = { "hist_${it.id}" }
+                key = { "hist_${it.id}" },
+                contentType = { "service_card" }
             ) { entry ->
                 ServiceCardComponent(
                     entry = entry,

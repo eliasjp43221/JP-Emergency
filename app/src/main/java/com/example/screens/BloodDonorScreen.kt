@@ -237,16 +237,17 @@ fun BloodDonorScreen(
             }
 
             // Upazila Filter Row
-            item {
+            item(key = "blood_upazila_filter", contentType = "filter") {
                 UpazilaFilterRow(
                     selectedUpazila = uiState.selectedUpazila,
-                    onSelectUpazila = onSelectUpazila
+                    onSelectUpazila = onSelectUpazila,
+                    upazilaCounts = uiState.upazilaCounts
                 )
             }
 
             // Donor & Blood Bank Items
             if (uiState.bloodDonors.isEmpty()) {
-                item {
+                item(key = "blood_empty_card", contentType = "empty") {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -282,7 +283,8 @@ fun BloodDonorScreen(
             } else {
                 items(
                     items = uiState.bloodDonors,
-                    key = { it.id }
+                    key = { it.id },
+                    contentType = { "donor_card" }
                 ) { donor ->
                     BloodDonorCard(
                         donor = donor,
@@ -303,7 +305,9 @@ private fun BloodDonorCard(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isPhoneValid = BengaliSearchAndFormatUtils.isValidPhoneNumber(donor.contactNumber)
+    val isPhoneValid = remember(donor.contactNumber) {
+        BengaliSearchAndFormatUtils.isValidPhoneNumber(donor.contactNumber)
+    }
 
     Card(
         modifier = modifier

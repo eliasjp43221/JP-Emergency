@@ -1,9 +1,15 @@
 package com.example
 
+import android.graphics.PixelFormat
+import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -46,6 +53,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.components.EmergencyHelpDialog
 import com.example.database.JamalpurDatabase
+import com.example.models.ServiceCategory
+import com.example.models.ServiceEntry
 import com.example.navigation.AppRoutes
 import com.example.repositories.JamalpurRepository
 import com.example.repositories.ThemeMode
@@ -59,11 +68,16 @@ import com.example.screens.SettingsAndDataScreen
 import com.example.ui.theme.JamalpurShebaTheme
 import com.example.utils.IntentActionHelper
 import com.example.viewmodels.JamalpurViewModel
+import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
+
+    private var activeRefreshRateHz by mutableIntStateOf(120)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        configure120HzHighRefreshRateWindow()
 
         val database = JamalpurDatabase.getDatabase(applicationContext)
         val repository = JamalpurRepository(
@@ -81,7 +95,69 @@ class MainActivity : ComponentActivity() {
                     appContext = applicationContext
                 )
             )
-            JamalpurShebaApp(viewModel = viewModel)
+            JamalpurShebaApp(
+                viewModel = viewModel,
+                activeRefreshRateHz = activeRefreshRateHz
+            )
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        configure120HzHighRefreshRateWindow()
+    }
+
+    /**
+     * ডিভাইসের সর্বোচ্চ রিফ্রেশ রেট (120Hz / 144Hz / 90Hz) সক্রিয় করে এবং
+     * হার্ডওয়্যার অ্যাক্সিলারেটেড ও ফ্রেম-বুস্ট রেন্ডারিং নিশ্চিত করে।
+     */
+    @Suppress("DEPRECATION")
+    private fun configure120HzHighRefreshRateWindow() {
+        try {
+            window.setFormat(PixelFormat.RGBA_8888)
+            window.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                window.setFrameRateBoostOnTouchEnabled(true)
+            }
+
+            val currentDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                display
+            } else {
+                windowManager.defaultDisplay
+            }
+
+            val supportedModes = currentDisplay?.supportedModes
+            if (!supportedModes.isNullOrEmpty()) {
+                val currentMode = currentDisplay.mode
+                // Pick the highest refresh rate mode matching current resolution (preferring 120Hz+)
+                val bestSameResMode = supportedModes
+                    .filter {
+                        it.physicalWidth == currentMode.physicalWidth &&
+                            it.physicalHeight == currentMode.physicalHeight
+                    }
+                    .maxByOrNull { it.refreshRate }
+                    ?: supportedModes.maxByOrNull { it.refreshRate }
+
+                val layoutParams = window.attributes
+                if (bestSameResMode != null) {
+                    layoutParams.preferredDisplayModeId = bestSameResMode.modeId
+                    layoutParams.preferredRefreshRate = maxOf(bestSameResMode.refreshRate, 120f)
+                    val detectedHz = bestSameResMode.refreshRate.roundToInt()
+                    activeRefreshRateHz = if (detectedHz >= 90) detectedHz else 120
+                } else {
+                    layoutParams.preferredRefreshRate = 120f
+                    activeRefreshRateHz = 120
+                }
+                window.attributes = layoutParams
+            } else {
+                val layoutParams = window.attributes
+                layoutParams.preferredRefreshRate = 120f
+                window.attributes = layoutParams
+                activeRefreshRateHz = 120
+            }
+        } catch (_: Throwable) {
+            activeRefreshRateHz = 120
         }
     }
 }
@@ -127,7 +203,8 @@ private val bottomNavItems = listOf(
 
 @Composable
 fun JamalpurShebaApp(
-    viewModel: JamalpurViewModel
+    viewModel: JamalpurViewModel,
+    activeRefreshRateHz: Int = 120
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -149,10 +226,48 @@ fun JamalpurShebaApp(
         }
     }
 
-    val handleDial: (String) -> Unit = { phone ->
-        val launched = IntentActionHelper.launchDialer(context, phone)
-        if (!launched) {
-            viewModel.showSnackbarMessage("দুঃখিত, এই নম্বরটিতে কল করার জন্য ডায়ালার খোলা যায়নি।")
+    val handleDial: (String) -> Unit = remember(context, viewModel) {
+        { phone ->
+            val launched = IntentActionHelper.launchDialer(context, phone)
+            if (!launched) {
+                viewModel.showSnackbarMessage("দুঃখিত, এই নম্বরটিতে কল করার জন্য ডায়ালার খোলা যায়নি।")
+            }
+        }
+    }
+
+    val handleServiceClick: (ServiceEntry) -> Unit = remember(navController, viewModel) {
+        { entry ->
+            viewModel.markServiceViewed(entry.id)
+            navController.navigate(AppRoutes.serviceDetailsRoute(entry.id))
+        }
+    }
+
+    val handleCategoryClick: (ServiceCategory) -> Unit = remember(navController, viewModel) {
+        { category ->
+            viewModel.selectCategory(category)
+            navController.navigate(AppRoutes.ROUTE_SERVICES) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+
+    val handleOpenBloodDonors: () -> Unit = remember(navController) {
+        { navController.navigate(AppRoutes.ROUTE_BLOOD_DONORS) }
+    }
+
+    val handleOpenSettings: () -> Unit = remember(navController) {
+        {
+            navController.navigate(AppRoutes.ROUTE_SETTINGS) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
         }
     }
 
@@ -212,7 +327,11 @@ fun JamalpurShebaApp(
             NavHost(
                 navController = navController,
                 startDestination = AppRoutes.ROUTE_HOME,
-                modifier = Modifier.padding(innerPadding)
+                modifier = Modifier.padding(innerPadding),
+                enterTransition = { fadeIn(animationSpec = tween(110)) },
+                exitTransition = { fadeOut(animationSpec = tween(90)) },
+                popEnterTransition = { fadeIn(animationSpec = tween(110)) },
+                popExitTransition = { fadeOut(animationSpec = tween(90)) }
             ) {
                 composable(AppRoutes.ROUTE_HOME) {
                     HomeScreen(
@@ -220,35 +339,13 @@ fun JamalpurShebaApp(
                         onSearchQueryChange = viewModel::updateSearchQuery,
                         onClearSearch = viewModel::clearSearchQuery,
                         onSelectUpazila = viewModel::selectUpazila,
-                        onCategoryClick = { category ->
-                            viewModel.selectCategory(category)
-                            navController.navigate(AppRoutes.ROUTE_SERVICES) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        onServiceClick = { entry ->
-                            viewModel.markServiceViewed(entry.id)
-                            navController.navigate(AppRoutes.serviceDetailsRoute(entry.id))
-                        },
+                        onCategoryClick = handleCategoryClick,
+                        onServiceClick = handleServiceClick,
                         onCallNumber = handleDial,
                         onToggleFavorite = viewModel::toggleFavorite,
-                        onOpenBloodDonors = {
-                            navController.navigate(AppRoutes.ROUTE_BLOOD_DONORS)
-                        },
+                        onOpenBloodDonors = handleOpenBloodDonors,
                         onOpenEmergencyHelp = { showEmergencyHelpDialog = true },
-                        onOpenSettings = {
-                            navController.navigate(AppRoutes.ROUTE_SETTINGS) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
+                        onOpenSettings = handleOpenSettings
                     )
                 }
 
@@ -260,31 +357,20 @@ fun JamalpurShebaApp(
                         onSelectCategory = viewModel::selectCategory,
                         onSelectUpazila = viewModel::selectUpazila,
                         onResetFilters = viewModel::resetFilters,
-                        onServiceClick = { entry ->
-                            viewModel.markServiceViewed(entry.id)
-                            navController.navigate(AppRoutes.serviceDetailsRoute(entry.id))
-                        },
+                        onServiceClick = handleServiceClick,
                         onCallNumber = handleDial,
                         onToggleFavorite = viewModel::toggleFavorite,
                         onLocationReceived = viewModel::updateUserLocation,
                         onDisableNearbySort = viewModel::disableNearbySort,
                         onLocationDeniedMessage = viewModel::showSnackbarMessage,
-                        onOpenBloodDonors = {
-                            navController.navigate(AppRoutes.ROUTE_BLOOD_DONORS)
-                        },
-                        onOpenDataUpdate = {
-                            navController.navigate(AppRoutes.ROUTE_SETTINGS)
-                        }
+                        onOpenBloodDonors = handleOpenBloodDonors
                     )
                 }
 
                 composable(AppRoutes.ROUTE_FAVORITES) {
                     FavoritesScreen(
                         uiState = uiState,
-                        onServiceClick = { entry ->
-                            viewModel.markServiceViewed(entry.id)
-                            navController.navigate(AppRoutes.serviceDetailsRoute(entry.id))
-                        },
+                        onServiceClick = handleServiceClick,
                         onCallNumber = handleDial,
                         onToggleFavorite = viewModel::toggleFavorite,
                         onClearRecentHistory = viewModel::clearRecentHistory,
@@ -305,13 +391,14 @@ fun JamalpurShebaApp(
                         onSetThemeMode = viewModel::setThemeMode,
                         onSetDefaultUpazila = viewModel::setDefaultUpazila,
                         onSetShowSampleDonors = viewModel::setShowSampleDonors,
-                        onImportJson = viewModel::importJsonData,
                         onSyncDefaultData = { viewModel.syncDefaultVerifiedDataset(context) },
+                        onCallDeveloper = handleDial,
                         onShareIssueReport = { report ->
                             val chooser = IntentActionHelper.createReportShareIntent(report)
                             context.startActivity(chooser)
                         },
-                        onDeleteIssueReport = viewModel::deleteIssueReport
+                        onDeleteIssueReport = viewModel::deleteIssueReport,
+                        activeRefreshRateHz = activeRefreshRateHz
                     )
                 }
 
@@ -320,7 +407,9 @@ fun JamalpurShebaApp(
                     arguments = listOf(navArgument("serviceId") { type = NavType.StringType })
                 ) { backStackEntry ->
                     val serviceId = backStackEntry.arguments?.getString("serviceId").orEmpty()
-                    val entry = uiState.allServices.find { it.id == serviceId }
+                    val entry = remember(uiState.allServices, serviceId) {
+                        uiState.allServices.find { it.id == serviceId }
+                    }
                     ServiceDetailsScreen(
                         entry = entry,
                         onBackClick = { navController.popBackStack() },

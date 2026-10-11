@@ -172,8 +172,8 @@ fun ServiceDetailsScreen(
             )
         }
 
-        val isPrimaryPhoneValid = BengaliSearchAndFormatUtils.isValidPhoneNumber(entry.primaryPhone)
-        val isSecondaryPhoneValid = BengaliSearchAndFormatUtils.isValidPhoneNumber(entry.secondaryPhone)
+        val isPrimaryPhoneValid = entry.isPrimaryPhoneValid
+        val isSecondaryPhoneValid = entry.isSecondaryPhoneValid
         val accentColor = CategoryIconHelper.getAccentColor(entry.category)
 
         LazyColumn(

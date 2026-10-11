@@ -7,8 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,6 +35,7 @@ import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -51,8 +50,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -78,14 +77,16 @@ import com.example.viewmodels.JamalpurUiState
 
 private val quickSearchSuggestions = listOf(
     "জামালপুর সদর হাসপাতাল",
-    "অ্যাম্বুলেন্স",
+    "সরকারি আশেক মাহমুদ কলেজ",
     "মেলান্দহ থানা",
     "ফায়ার সার্ভিস",
     "রক্তদাতা",
     "বিদ্যুৎ অফিস"
 )
 
-@OptIn(ExperimentalLayoutApi::class)
+private val prechunkedCategoryRows: List<List<ServiceCategory>> =
+    ServiceCategory.displayCategories.chunked(2)
+
 @Composable
 fun HomeScreen(
     uiState: JamalpurUiState,
@@ -109,10 +110,10 @@ fun HomeScreen(
             .fillMaxSize()
             .testTag("home_screen_list"),
         contentPadding = PaddingValues(bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // ==================== A. HEADER & HERO BANNER ====================
-        item {
+        item(key = "home_header", contentType = "header") {
             HomeHeaderSection(
                 totalServicesCount = uiState.allServices.size,
                 onOpenEmergencyHelp = onOpenEmergencyHelp,
@@ -121,7 +122,7 @@ fun HomeScreen(
         }
 
         // ==================== B. PROMINENT SEARCH BAR ====================
-        item {
+        item(key = "home_search_bar", contentType = "search_bar") {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -135,7 +136,7 @@ fun HomeScreen(
                         .testTag("home_search_input"),
                     placeholder = {
                         Text(
-                            text = "হাসপাতাল, অ্যাম্বুলেন্স, থানা বা সেবা খুঁজুন...",
+                            text = "হাসপাতাল, অ্যাম্বুলেন্স, কলেজ, থানা বা সেবা খুঁজুন...",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     },
@@ -151,7 +152,7 @@ fun HomeScreen(
                             IconButton(
                                 onClick = onClearSearch,
                                 modifier = Modifier
-                                    .minimumInteractiveComponentSize()
+                                    .size(44.dp)
                                     .testTag("clear_search_button")
                             ) {
                                 Icon(
@@ -176,7 +177,11 @@ fun HomeScreen(
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(quickSearchSuggestions) { suggestion ->
+                    items(
+                        items = quickSearchSuggestions,
+                        key = { it },
+                        contentType = { "suggestion_chip" }
+                    ) { suggestion ->
                         AssistChip(
                             onClick = { onSearchQueryChange(suggestion) },
                             label = {
@@ -194,7 +199,7 @@ fun HomeScreen(
         }
 
         // ==================== UPAZILA SELECTION ROW ====================
-        item {
+        item(key = "home_upazila_selector", contentType = "upazila_selector") {
             Column {
                 Row(
                     modifier = Modifier
@@ -224,7 +229,7 @@ fun HomeScreen(
 
         // ==================== LIVE SEARCH / FILTER RESULTS ====================
         if (isSearchingOrFiltering) {
-            item {
+            item(key = "search_results_header", contentType = "section_header") {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -251,7 +256,7 @@ fun HomeScreen(
             }
 
             if (uiState.filteredServices.isEmpty()) {
-                item {
+                item(key = "empty_search_card", contentType = "empty_state") {
                     EmptySearchResultCard(
                         query = uiState.searchQuery,
                         upazila = uiState.selectedUpazila,
@@ -267,7 +272,8 @@ fun HomeScreen(
             } else {
                 items(
                     items = uiState.filteredServices,
-                    key = { "search_${it.id}" }
+                    key = { "search_${it.id}" },
+                    contentType = { "service_card" }
                 ) { service ->
                     ServiceCardComponent(
                         entry = service,
@@ -280,7 +286,7 @@ fun HomeScreen(
             }
         } else {
             // ==================== C. EMERGENCY QUICK ACTIONS ====================
-            item {
+            item(key = "emergency_quick_actions", contentType = "quick_actions") {
                 EmergencyQuickActionsSection(
                     onCall999 = { onCallNumber("999") },
                     onCall102 = { onCallNumber("102") },
@@ -291,8 +297,8 @@ fun HomeScreen(
                 )
             }
 
-            // ==================== D. SERVICE CATEGORIES GRID ====================
-            item {
+            // ==================== D. SERVICE CATEGORIES GRID (INCREMENTAL LAZY ROWS FOR 120HZ SMOOTH SCROLLING) ====================
+            item(key = "categories_section_header", contentType = "section_header") {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -308,71 +314,69 @@ fun HomeScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
 
-                    val categories = ServiceCategory.displayCategories
-                    val rows = categories.chunked(2)
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        for (rowItems in rows) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                for (cat in rowItems) {
-                                    val count = uiState.categoryCounts[cat] ?: 0
-                                    CategoryGridCard(
-                                        category = cat,
-                                        count = count,
-                                        onClick = {
-                                            if (cat == ServiceCategory.BLOOD_DONOR) {
-                                                onOpenBloodDonors()
-                                            } else {
-                                                onCategoryClick(cat)
-                                            }
-                                        },
-                                        modifier = Modifier.weight(1f)
-                                    )
+            items(
+                items = prechunkedCategoryRows,
+                key = { row -> "cat_row_${row.first().id}" },
+                contentType = { "category_row" }
+            ) { rowItems ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    for (cat in rowItems) {
+                        val count = uiState.categoryCounts[cat] ?: 0
+                        CategoryGridCard(
+                            category = cat,
+                            count = count,
+                            onClick = {
+                                if (cat == ServiceCategory.BLOOD_DONOR) {
+                                    onOpenBloodDonors()
+                                } else {
+                                    onCategoryClick(cat)
                                 }
-                                if (rowItems.size == 1) {
-                                    Spacer(modifier = Modifier.weight(1f))
-                                }
-                            }
-                        }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (rowItems.size == 1) {
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
 
             // ==================== RECENTLY VIEWED SERVICES ====================
             if (uiState.recentlyViewedServices.isNotEmpty()) {
-                item {
-                    Column(
+                item(key = "recent_header", contentType = "section_header") {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.History,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "সম্প্রতি দেখা সেবাসমূহ",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "সম্প্রতি দেখা সেবাসমূহ",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
                     }
                 }
 
                 items(
                     items = uiState.recentlyViewedServices.take(3),
-                    key = { "recent_${it.id}" }
+                    key = { "recent_${it.id}" },
+                    contentType = { "service_card" }
                 ) { service ->
                     ServiceCardComponent(
                         entry = service,
@@ -393,18 +397,21 @@ private fun HomeHeaderSection(
     onOpenEmergencyHelp: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val headerBrush = remember(primaryColor) {
+        Brush.verticalGradient(
+            colors = listOf(
+                primaryColor,
+                primaryColor.copy(alpha = 0.88f)
+            )
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.88f)
-                    )
-                )
-            )
-            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .background(brush = headerBrush)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -437,7 +444,7 @@ private fun HomeHeaderSection(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
-                        .height(48.dp)
+                        .height(46.dp)
                         .testTag("header_emergency_button")
                 ) {
                     Icon(
@@ -455,7 +462,7 @@ private fun HomeHeaderSection(
                 IconButton(
                     onClick = onOpenSettings,
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(46.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.15f))
                         .testTag("header_settings_button")
@@ -471,20 +478,19 @@ private fun HomeHeaderSection(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Hero Banner Card with generated illustration and offline badge
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(118.dp)
+                        .height(112.dp)
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.img_jamalpur_banner_1791687349108),
@@ -515,6 +521,30 @@ private fun HomeHeaderSection(
                             )
                         }
                     }
+
+                    Surface(
+                        color = Color(0xFF004D40).copy(alpha = 0.90f),
+                        shape = RoundedCornerShape(bottomStart = 12.dp),
+                        modifier = Modifier.align(Alignment.TopEnd)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Speed,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "120Hz Smooth UI",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White
+                            )
+                        }
+                    }
                 }
 
                 Row(
@@ -532,7 +562,7 @@ private fun HomeHeaderSection(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "অফলাইন ডিরেক্টরি সক্রিয় — ইন্টারনেট ছাড়াই সকল সংরক্ষিত নম্বর ও ঠিকানা ব্যবহারযোগ্য",
+                        text = "অফলাইন ডিরেক্টরি সক্রিয় — ইন্টারনেট ছাড়াই সকল কলেজ, সরকারি সংস্থা ও জরুরি নম্বর ব্যবহারযোগ্য",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -582,7 +612,6 @@ private fun EmergencyQuickActionsSection(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Top 2 National Verified Emergency Hotlines (999 and 102)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -596,7 +625,7 @@ private fun EmergencyQuickActionsSection(
                     containerColor = MaterialTheme.colorScheme.error
                 ),
                 shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -636,7 +665,7 @@ private fun EmergencyQuickActionsSection(
                     containerColor = Color(0xFFD84315)
                 ),
                 shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -670,7 +699,6 @@ private fun EmergencyQuickActionsSection(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Secondary 4 Emergency Quick Shortcuts
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -728,17 +756,18 @@ private fun EmergencyShortcutButton(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         border = BorderStroke(1.dp, accentColor.copy(alpha = 0.25f)),
-        shape = RoundedCornerShape(14.dp)
+        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp, horizontal = 6.dp),
+                .padding(vertical = 10.dp, horizontal = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(38.dp)
                     .clip(CircleShape)
                     .background(accentColor.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
@@ -747,7 +776,7 @@ private fun EmergencyShortcutButton(
                     imageVector = icon,
                     contentDescription = titleBn,
                     tint = accentColor,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
             Spacer(modifier = Modifier.height(6.dp))
@@ -770,7 +799,16 @@ private fun CategoryGridCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val accentColor = CategoryIconHelper.getAccentColor(category)
+    val accentColor = remember(category) { CategoryIconHelper.getAccentColor(category) }
+    val categoryIcon = remember(category) { CategoryIconHelper.getIcon(category) }
+    val countText = remember(category, count) {
+        if (category == ServiceCategory.BLOOD_DONOR) {
+            "ব্লাড ব্যাংক ও দাতা"
+        } else {
+            "${BengaliSearchAndFormatUtils.toBengaliNumber(count)}টি যাচাইকৃত সেবা"
+        }
+    }
+
     Card(
         modifier = modifier
             .testTag("category_card_${category.id}")
@@ -780,7 +818,7 @@ private fun CategoryGridCard(
         ),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
@@ -796,7 +834,7 @@ private fun CategoryGridCard(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = CategoryIconHelper.getIcon(category),
+                    imageVector = categoryIcon,
                     contentDescription = category.titleBn,
                     tint = accentColor,
                     modifier = Modifier.size(24.dp)
@@ -811,21 +849,10 @@ private fun CategoryGridCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                val countText = if (category == ServiceCategory.BLOOD_DONOR) {
-                    "ব্লাড ব্যাংক ও দাতা"
-                } else if (count > 0) {
-                    "${BengaliSearchAndFormatUtils.toBengaliNumber(count)}টি যাচাইকৃত তথ্য"
-                } else {
-                    "তথ্য সংযোজন প্রক্রিয়াধীন"
-                }
                 Text(
                     text = countText,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (count > 0 || category == ServiceCategory.BLOOD_DONOR) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -844,7 +871,8 @@ fun EmptySearchResultCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
         ),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier

@@ -1,9 +1,11 @@
 package com.example.viewmodels
 
 import android.content.Context
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.data.VerifiedJamalpurSeedData
 import com.example.models.BloodDonorEntry
 import com.example.models.DataImportResult
 import com.example.models.IssueReportEntry
@@ -15,15 +17,19 @@ import com.example.repositories.ThemeMode
 import com.example.repositories.UserPreferencesRepository
 import com.example.repositories.UserPreferencesState
 import com.example.utils.BengaliSearchAndFormatUtils
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+@Immutable
 data class FilterAndLocationState(
     val searchQuery: String = "",
     val selectedCategory: ServiceCategory = ServiceCategory.ALL,
@@ -37,6 +43,7 @@ data class FilterAndLocationState(
     val isInitialized: Boolean = false
 )
 
+@Immutable
 data class JamalpurUiState(
     val allServices: List<ServiceEntry> = emptyList(),
     val filteredServices: List<ServiceEntry> = emptyList(),
@@ -56,8 +63,32 @@ data class JamalpurUiState(
     val snackbarMessageBn: String? = null,
     val categoryCounts: Map<ServiceCategory, Int> = emptyMap(),
     val upazilaCounts: Map<Upazila, Int> = emptyMap(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = false
 )
+
+private data class ServicesWithCounts(
+    val services: List<ServiceEntry>,
+    val categoryCounts: Map<ServiceCategory, Int>,
+    val upazilaCounts: Map<Upazila, Int>
+)
+
+private fun computeServicesWithCounts(rawServices: List<ServiceEntry>): ServicesWithCounts {
+    val services = rawServices.ifEmpty { VerifiedJamalpurSeedData.cachedDefaultEntries }
+    val catCounts = ServiceCategory.displayCategories.associateWith { cat ->
+        services.count { it.categoryId == cat.id }
+    }
+    val upzCounts = Upazila.entries.associateWith { upz ->
+        when (upz) {
+            Upazila.ALL -> services.size
+            else -> services.count { it.upazilaId == upz.id }
+        }
+    }
+    return ServicesWithCounts(
+        services = services,
+        categoryCounts = catCounts,
+        upazilaCounts = upzCounts
+    )
+}
 
 class JamalpurViewModel(
     private val repository: JamalpurRepository,
@@ -68,29 +99,32 @@ class JamalpurViewModel(
     private val filterState = MutableStateFlow(FilterAndLocationState())
 
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.ensureSeedDataPopulated(appContext)
             filterState.update { it.copy(isInitialized = true) }
         }
     }
 
+    private val servicesWithCountsFlow = repository.allServices
+        .onStart { emit(VerifiedJamalpurSeedData.cachedDefaultEntries) }
+        .map { computeServicesWithCounts(it) }
+        .flowOn(Dispatchers.Default)
+
     val uiState: StateFlow<JamalpurUiState> = combine(
-        repository.allServices.onStart { emit(emptyList()) },
+        servicesWithCountsFlow,
         repository.favoriteServices.onStart { emit(emptyList()) },
         repository.recentlyViewedServices.onStart { emit(emptyList()) },
-        repository.allBloodDonors.onStart { emit(emptyList()) },
+        repository.allBloodDonors.onStart { emit(VerifiedJamalpurSeedData.defaultInstitutionalBloodBanks()) },
         repository.allIssueReports.onStart { emit(emptyList()) }
-    ) { services, favorites, recent, donors, reports ->
-         QuintupleData(services, favorites, recent, donors, reports)
+    ) { servicesData, favorites, recent, donors, reports ->
+        QuintupleData(servicesData, favorites, recent, donors, reports)
     }.combine(
         preferencesRepository.preferencesFlow.onStart { emit(UserPreferencesState()) }
     ) { data, prefs ->
         data to prefs
     }.combine(filterState) { (data, prefs), filter ->
-        val (rawServices, favorites, recent, donors, reports) = data
-        val services = rawServices.ifEmpty {
-            com.example.data.VerifiedJamalpurSeedData.defaultSeedItems().map { it.toServiceEntry() }
-        }
+        val (servicesData, favorites, recent, donors, reports) = data
+        val services = servicesData.services
 
         val baseFiltered = BengaliSearchAndFormatUtils.filterServices(
             services = services,
@@ -125,17 +159,6 @@ class JamalpurViewModel(
             sampleMatch && groupMatch && upazilaMatch
         }
 
-        val catCounts = ServiceCategory.displayCategories.associateWith { cat ->
-            services.count { it.categoryId == cat.id }
-        }
-
-        val upzCounts = Upazila.entries.associateWith { upz ->
-            when (upz) {
-                Upazila.ALL -> services.size
-                else -> services.count { it.upazilaId == upz.id }
-            }
-        }
-
         JamalpurUiState(
             allServices = services,
             filteredServices = sortedFiltered,
@@ -153,22 +176,27 @@ class JamalpurViewModel(
             preferences = prefs,
             lastImportResult = filter.lastImportResult,
             snackbarMessageBn = filter.snackbarMessageBn,
-            categoryCounts = catCounts,
-            upazilaCounts = upzCounts,
-            isLoading = !filter.isInitialized && services.isEmpty()
+            categoryCounts = servicesData.categoryCounts,
+            upazilaCounts = servicesData.upazilaCounts,
+            isLoading = false
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = run {
-            val initialServices = com.example.data.VerifiedJamalpurSeedData.defaultSeedItems().map { it.toServiceEntry() }
-            JamalpurUiState(
-                allServices = initialServices,
-                filteredServices = initialServices,
-                isLoading = false
-            )
-        }
-    )
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = run {
+                val initialData = computeServicesWithCounts(VerifiedJamalpurSeedData.cachedDefaultEntries)
+                JamalpurUiState(
+                    allServices = initialData.services,
+                    filteredServices = initialData.services,
+                    bloodDonors = VerifiedJamalpurSeedData.defaultInstitutionalBloodBanks(),
+                    categoryCounts = initialData.categoryCounts,
+                    upazilaCounts = initialData.upazilaCounts,
+                    isLoading = false
+                )
+            }
+        )
 
     fun updateSearchQuery(query: String) {
         filterState.update { it.copy(searchQuery = query) }
@@ -222,7 +250,7 @@ class JamalpurViewModel(
     }
 
     fun toggleFavorite(entry: ServiceEntry) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.toggleFavorite(entry.id, entry.isFavorite)
             val msg = if (!entry.isFavorite) {
                 "'${entry.nameBn}' প্রিয় তালিকায় যুক্ত করা হয়েছে।"
@@ -234,13 +262,13 @@ class JamalpurViewModel(
     }
 
     fun markServiceViewed(serviceId: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.markServiceViewed(serviceId)
         }
     }
 
     fun clearRecentHistory() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.clearRecentHistory()
             filterState.update { it.copy(snackbarMessageBn = "সম্প্রতি দেখা সেবার ইতিহাস মুছে ফেলা হয়েছে।") }
         }
@@ -254,7 +282,7 @@ class JamalpurViewModel(
         availabilityNoteBn: String,
         isAvailabilityConfirmed: Boolean
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.addVoluntaryBloodDonor(
                 displayNameBn = displayNameBn,
                 bloodGroup = bloodGroup,
@@ -270,7 +298,7 @@ class JamalpurViewModel(
     }
 
     fun removeBloodDonor(donorId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.removeBloodDonor(donorId)
             filterState.update {
                 it.copy(snackbarMessageBn = "রক্তদাতার তথ্য তালিকা থেকে মুছে ফেলা হয়েছে।")
@@ -286,7 +314,7 @@ class JamalpurViewModel(
         suggestedCorrectionBn: String,
         onReportSaved: (IssueReportEntry) -> Unit = {}
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val saved = repository.submitLocalIssueReport(
                 serviceId = serviceId,
                 serviceNameBn = serviceNameBn,
@@ -297,31 +325,21 @@ class JamalpurViewModel(
             filterState.update {
                 it.copy(snackbarMessageBn = "রিপোর্টটি স্থানীয়ভাবে সংরক্ষিত হয়েছে। আপনি এখন এটি শেয়ার করতে পারেন।")
             }
-            onReportSaved(saved)
+            launch(Dispatchers.Main) {
+                onReportSaved(saved)
+            }
         }
     }
 
     fun deleteIssueReport(reportId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.deleteIssueReport(reportId)
             filterState.update { it.copy(snackbarMessageBn = "রিপোর্টটি মুছে ফেলা হয়েছে।") }
         }
     }
 
-    fun importJsonData(jsonString: String) {
-        viewModelScope.launch {
-            val result = repository.importServicesFromJson(jsonString)
-            filterState.update {
-                it.copy(
-                    lastImportResult = result,
-                    snackbarMessageBn = result.messageBn
-                )
-            }
-        }
-    }
-
     fun syncDefaultVerifiedDataset(context: Context? = null) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val result = repository.resetOrSyncDefaultSeedData(context)
             filterState.update {
                 it.copy(
@@ -333,20 +351,20 @@ class JamalpurViewModel(
     }
 
     fun setThemeMode(mode: ThemeMode) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             preferencesRepository.setThemeMode(mode)
         }
     }
 
     fun setDefaultUpazila(upazila: Upazila) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             preferencesRepository.setDefaultUpazila(upazila)
             filterState.update { it.copy(selectedUpazila = upazila) }
         }
     }
 
     fun setShowSampleDonors(show: Boolean) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             preferencesRepository.setShowSampleDonors(show)
         }
     }
@@ -360,7 +378,7 @@ class JamalpurViewModel(
     }
 
     private data class QuintupleData(
-        val services: List<ServiceEntry>,
+        val servicesData: ServicesWithCounts,
         val favorites: List<ServiceEntry>,
         val recent: List<ServiceEntry>,
         val donors: List<BloodDonorEntry>,

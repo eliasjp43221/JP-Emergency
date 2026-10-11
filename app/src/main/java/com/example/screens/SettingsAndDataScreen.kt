@@ -1,5 +1,6 @@
 package com.example.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -18,16 +19,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -35,15 +39,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -62,15 +61,13 @@ fun SettingsAndDataScreen(
     onSetThemeMode: (ThemeMode) -> Unit,
     onSetDefaultUpazila: (Upazila) -> Unit,
     onSetShowSampleDonors: (Boolean) -> Unit,
-    onImportJson: (String) -> Unit,
     onSyncDefaultData: () -> Unit,
+    onCallDeveloper: (String) -> Unit,
     onShareIssueReport: (IssueReportEntry) -> Unit,
     onDeleteIssueReport: (Long) -> Unit,
+    activeRefreshRateHz: Int = 120,
     modifier: Modifier = Modifier
 ) {
-    var customJsonInput by remember { mutableStateOf("") }
-    var showJsonEditor by remember { mutableStateOf(false) }
-
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -78,7 +75,7 @@ fun SettingsAndDataScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
+        item(key = "settings_header", contentType = "header") {
             Column {
                 Text(
                     text = "সেটিংস, ডাটা আপডেট ও পরিচিতি",
@@ -86,15 +83,66 @@ fun SettingsAndDataScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "অ্যাপের থিম, ডিফল্ট এলাকা, অফলাইন ডাটাবেস আপডেট এবং গোপনীয়তা নীতিমালা",
+                    text = "১২০ হার্জ স্মুথ ইন্টারফেস, থিম, ডিফল্ট এলাকা ও ডেভেলপার পরিচিতি",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        // ১. থিম ও প্রদর্শনী সেটিংস
-        item {
+        // ১. ১২০ হার্জ আল্ট্রা-স্মুথ পারফরম্যান্স স্ট্যাটাস
+        item(key = "settings_120hz_card", contentType = "card") {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Speed,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "120Hz Ultra-Smooth UI Engine সক্রিয়",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "ডিসপ্লে রিফ্রেশ রেট: ${activeRefreshRateHz}Hz • হার্ডওয়্যার অ্যাক্সিলারেটেড স্ক্রলিং ও জিরো-ল্যাগ রেন্ডারিং",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        // ২. থিম ও প্রদর্শনী সেটিংস
+        item(key = "settings_theme_card", contentType = "card") {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -180,8 +228,8 @@ fun SettingsAndDataScreen(
             }
         }
 
-        // ২. ডাটা আপডেট ও JSON ইমপোর্ট সিস্টেম (Section 11)
-        item {
+        // ৩. অফলাইন ডাটাবেস তথ্য ও সিঙ্ক (কোনো আপলোড বা JSON অপশন ছাড়া)
+        item(key = "settings_db_card", contentType = "card") {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -199,106 +247,38 @@ fun SettingsAndDataScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "অফলাইন ডাটাবেস ও JSON আপডেট সিস্টেম",
+                            text = "অফলাইন ডাটাবেস স্ট্যাটাস",
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
 
                     Text(
-                        text = "বর্তমান ডাটাবেস সংস্করণ: v${uiState.preferences.datasetVersion} • মোট সংরক্ষিত সেবা: ${BengaliSearchAndFormatUtils.toBengaliNumber(uiState.allServices.size)}টি",
+                        text = "ডাটাবেস সংস্করণ: v2.0.0 • মোট সংরক্ষিত যাচাইকৃত সেবা: ${BengaliSearchAndFormatUtils.toBengaliNumber(uiState.allServices.size)}টি",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
                     )
 
                     Text(
-                        text = "নতুন যাচাইকৃত সরকারি বা প্রাতিষ্ঠানিক সেবার তথ্য ভার্সনযুক্ত JSON ফরম্যাটে যাচাই ও ডুপ্লিকেট পরীক্ষা করে লোকাল ডাটাবেসে যুক্ত করতে পারবেন।",
+                        text = "জামালপুর সদরের সকল সরকারি ও বেসরকারি কলেজ, সমস্ত সরকারি দপ্তর এবং ৭টি উপজেলার জরুরি সেবার পূর্ণাঙ্গ তথ্য অ্যাপের ভেতরে অফলাইনে সংরক্ষিত রয়েছে।",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(
-                            onClick = onSyncDefaultData,
-                            modifier = Modifier.testTag("sync_default_data_button")
-                        ) {
-                            Text("ডিফল্ট ডাটা রিসেট/সিঙ্ক")
-                        }
-                        OutlinedButton(
-                            onClick = { showJsonEditor = !showJsonEditor },
-                            modifier = Modifier.testTag("toggle_json_import_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FileUpload,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(if (showJsonEditor) "JSON বক্স লুকান" else "JSON ইমপোর্ট")
-                        }
-                    }
-
-                    if (showJsonEditor) {
-                        OutlinedTextField(
-                            value = customJsonInput,
-                            onValueChange = { customJsonInput = it },
-                            label = { Text("ভার্সনযুক্ত JSON ডাটা পেস্ট করুন (schemaVersion: 1)") },
-                            placeholder = {
-                                Text("{\"schemaVersion\": 1, \"datasetVersion\": \"1.0.1\", \"districtNameBn\": \"জামালপুর\", \"lastUpdatedBn\": \"অক্টোবর ২০২৬\", \"services\": [...]}")
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("json_import_text_field"),
-                            minLines = 4
-                        )
-
-                        Button(
-                            onClick = { onImportJson(customJsonInput) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("execute_json_import_button")
-                        ) {
-                            Text("যাচাই ও ইমপোর্ট করুন")
-                        }
-                    }
-
-                    if (uiState.lastImportResult != null) {
-                        val res = uiState.lastImportResult
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (res.isSuccess) {
-                                    MaterialTheme.colorScheme.primaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.errorContainer
-                                }
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = res.messageBn,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                if (res.errorsBn.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    for (err in res.errorsBn.take(3)) {
-                                        Text(
-                                            text = "• $err",
-                                            style = MaterialTheme.typography.labelSmall
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                    Button(
+                        onClick = onSyncDefaultData,
+                        modifier = Modifier.testTag("sync_default_data_button"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("ডিফল্ট ডাটাবেস রিসেট / রিফ্রেশ করুন")
                     }
                 }
             }
         }
 
-        // ৩. সংরক্ষিত তথ্য সংশোধন রিপোর্টসমূহ (Issue Reports)
+        // ৪. সংরক্ষিত তথ্য সংশোধন রিপোর্টসমূহ (Issue Reports)
         if (uiState.issueReports.isNotEmpty()) {
-            item {
+            item(key = "settings_reports_header", contentType = "header") {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -326,7 +306,8 @@ fun SettingsAndDataScreen(
 
             items(
                 items = uiState.issueReports,
-                key = { "rep_${it.id}" }
+                key = { "rep_${it.id}" },
+                contentType = { "report_item" }
             ) { report ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -369,16 +350,18 @@ fun SettingsAndDataScreen(
             }
         }
 
-        // ৪. অ্যাপ পরিচিতি, তথ্যের দায়মুক্তি ও গোপনীয়তা নীতি (About & Privacy Policy)
-        item {
+        // ৫. অ্যাপ পরিচিতি, ডেভেলপার তথ্য, দায়মুক্তি ও গোপনীয়তা নীতি (About & Developer Info)
+        item(key = "settings_about_card", contentType = "card") {
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("about_section_card"),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
@@ -389,18 +372,79 @@ fun SettingsAndDataScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "অ্যাপ পরিচিতি (About জামালপুর সেবা)",
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
                     }
 
+                    // Developer Highlight Box requested by User
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("developer_credit_box"),
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "This app make by Elias Hossain",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            Text(
+                                text = "Phone Number +8801889515106",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Button(
+                                onClick = { onCallDeveloper("+8801889515106") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
+                                    .testTag("call_developer_button"),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Call,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("ডেভেলপারকে কল করুন (+8801889515106)")
+                            }
+                        }
+                    }
+
                     Text(
-                        text = "সংস্করণ (Version): 1.0.0 (Production Release)\nপ্যাকেজ আইডি: com.jamalpur.sheba\nআওতাধীন এলাকা: জামালপুর জেলার ৭টি উপজেলা (জামালপুর সদর, মেলান্দহ, ইসলামপুর, দেওয়ানগঞ্জ, সরিষাবাড়ী, মাদারগঞ্জ ও বকশীগঞ্জ)।",
+                        text = "সংস্করণ (Version): 2.0.0 (120Hz Ultra-Smooth Release)\nপ্যাকেজ আইডি: com.jamalpur.sheba\nআওতাধীন এলাকা: জামালপুর জেলার ৭টি উপজেলা (জামালপুর সদর, মেলান্দহ, ইসলামপুর, দেওয়ানগঞ্জ, সরিষাবাড়ী, মাদারগঞ্জ ও বকশীগঞ্জ)।",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Text(
-                        text = "উদ্দেশ্য: জামালপুর জেলার সাধারণ মানুষের জন্য জরুরি মুহূর্তে জাতীয় হটলাইন (৯৯৯, ১০২, ১৬২৬৩), সরকারি হাসপাতাল, উপজেলা স্বাস্থ্য কমপ্লেক্স, ৭টি থানার ওসি নম্বর, ফায়ার সার্ভিস স্টেশন, পল্লী বিদ্যুৎ এবং সরকারি দপ্তরের যাচাইকৃত তথ্য ইন্টারনেট ছাড়াই সহজলভ্য করা।",
+                        text = "উদ্দেশ্য: জামালপুর জেলার সাধারণ মানুষের জন্য জরুরি মুহূর্তে জাতীয় হটলাইন (৯৯৯, ১০২, ১৬২৬৩), সরকারি হাসপাতাল, উপজেলা স্বাস্থ্য কমপ্লেক্স, ৭টি থানার ওসি নম্বর, ফায়ার সার্ভিস স্টেশন, পল্লী বিদ্যুৎ, জামালপুর সদরের সকল কলেজ এবং সরকারি সংস্থার যাচাইকৃত তথ্য ইন্টারনেট ছাড়াই সহজলভ্য করা।",
                         style = MaterialTheme.typography.bodyMedium
                     )
 
@@ -420,7 +464,7 @@ fun SettingsAndDataScreen(
                     }
 
                     Text(
-                        text = "এই অ্যাপের তথ্যসমূহ বাংলাদেশ জাতীয় তথ্য বাতায়ন (jamalpur.gov.bd), স্বাস্থ্য অধিদপ্তর (DGHS) এবং ফায়ার সার্ভিসের প্রকাশিত ডিরেক্টরি থেকে সংগ্রহ ও যাচাই করা হয়েছে। এটি কোনো সরকারি সংস্থার দাপ্তরিক অ্যাপ নয়। দাপ্তরিক নম্বর সময়ের সাথে পরিবর্তিত হতে পারে; কোনো নম্বরে অসঙ্গতি দেখলে 'তথ্যে সমস্যা জানান' বাটনের মাধ্যমে রিপোর্ট করার অনুরোধ করা হচ্ছে। চরম জরুরি অবস্থায় সর্বদা জাতীয় হটলাইন ৯৯৯ বা ১০২ ব্যবহার করুন।",
+                        text = "এই অ্যাপের তথ্যসমূহ বাংলাদেশ জাতীয় তথ্য বাতায়ন (jamalpur.gov.bd), স্বাস্থ্য অধিদপ্তর (DGHS), শিক্ষা বোর্ড এবং ফায়ার সার্ভিসের প্রকাশিত ডিরেক্টরি থেকে সংগ্রহ ও যাচাই করা হয়েছে। এটি কোনো সরকারি সংস্থার দাপ্তরিক অ্যাপ নয়। চরম জরুরি অবস্থায় সর্বদা জাতীয় হটলাইন ৯৯৯ বা ১০২ ব্যবহার করুন।",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

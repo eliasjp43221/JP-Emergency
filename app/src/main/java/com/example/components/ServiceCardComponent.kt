@@ -6,8 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -41,12 +39,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,7 +59,11 @@ import com.example.ui.theme.VerifiedGreen
 import com.example.ui.theme.VerifiedGreenContainer
 import com.example.utils.BengaliSearchAndFormatUtils
 
-@OptIn(ExperimentalLayoutApi::class)
+private val CardShape16 = RoundedCornerShape(16.dp)
+private val IconBoxShape12 = RoundedCornerShape(12.dp)
+private val BadgeShape8 = RoundedCornerShape(8.dp)
+private val ButtonShape12 = RoundedCornerShape(12.dp)
+
 @Composable
 fun ServiceCardComponent(
     entry: ServiceEntry,
@@ -72,21 +73,22 @@ fun ServiceCardComponent(
     distanceKm: Double? = null,
     modifier: Modifier = Modifier
 ) {
-    val accentColor = CategoryIconHelper.getAccentColor(entry.category)
-    val isPhoneValid = BengaliSearchAndFormatUtils.isValidPhoneNumber(entry.primaryPhone)
+    val accentColor = remember(entry.categoryId) { CategoryIconHelper.getAccentColor(entry.category) }
+    val categoryIcon = remember(entry.categoryId) { CategoryIconHelper.getIcon(entry.category) }
+    val isPhoneValid = entry.isPrimaryPhoneValid
 
     Card(
         modifier = modifier
             .fillMaxWidth()
             .testTag("service_card_${entry.id}")
             .clickable(onClick = onCardClick),
-        shape = MaterialTheme.shapes.medium,
+        shape = CardShape16,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = if (entry.isNationalEmergencyHotline) {
-            BorderStroke(1.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+            BorderStroke(1.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.45f))
         } else {
             BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.16f))
         }
@@ -94,7 +96,7 @@ fun ServiceCardComponent(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(14.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -102,16 +104,16 @@ fun ServiceCardComponent(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(44.dp)
+                        .clip(IconBoxShape12)
                         .background(accentColor.copy(alpha = 0.12f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = CategoryIconHelper.getIcon(entry.category),
+                        imageVector = categoryIcon,
                         contentDescription = entry.category.titleBn,
                         tint = accentColor,
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
@@ -139,7 +141,7 @@ fun ServiceCardComponent(
                 IconButton(
                     onClick = onFavoriteToggle,
                     modifier = Modifier
-                        .minimumInteractiveComponentSize()
+                        .size(44.dp)
                         .testTag("favorite_toggle_${entry.id}")
                 ) {
                     Icon(
@@ -150,80 +152,88 @@ fun ServiceCardComponent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            FlowRow(
+            // Fast single-pass Row instead of multi-pass FlowRow for 120Hz smooth scrolling
+            Row(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 VerificationStatusBadge(status = entry.status)
 
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = BadgeShape8,
                     color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
                     Text(
                         text = entry.upazila.nameBn,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Text(
-                        text = entry.category.titleBn,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
 
                 if (entry.isEmergency24hVerified) {
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = BadgeShape8,
                         color = MaterialTheme.colorScheme.errorContainer
                     ) {
                         Text(
-                            text = "২৪ ঘণ্টা জরুরি সেবা",
+                            text = "২৪ ঘণ্টা জরুরি",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onErrorContainer,
+                            maxLines = 1,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                } else {
+                    Surface(
+                        shape = BadgeShape8,
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = entry.category.titleBn,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
                 }
+            }
 
-                if (distanceKm != null) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer
+            if (distanceKm != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Surface(
+                    shape = BadgeShape8,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.NearMe,
-                                contentDescription = "দূরত্ব",
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = BengaliSearchAndFormatUtils.formatDistanceBn(distanceKm),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.NearMe,
+                            contentDescription = "দূরত্ব",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = BengaliSearchAndFormatUtils.formatDistanceBn(distanceKm),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -237,12 +247,12 @@ fun ServiceCardComponent(
                     text = entry.addressBn,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -254,7 +264,7 @@ fun ServiceCardComponent(
                     enabled = isPhoneValid,
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp)
+                        .height(46.dp)
                         .testTag("call_button_${entry.id}"),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (entry.isNationalEmergencyHotline) {
@@ -263,7 +273,7 @@ fun ServiceCardComponent(
                             MaterialTheme.colorScheme.primary
                         }
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = ButtonShape12
                 ) {
                     Icon(
                         imageVector = Icons.Default.Call,
@@ -282,9 +292,9 @@ fun ServiceCardComponent(
                 OutlinedButton(
                     onClick = onCardClick,
                     modifier = Modifier
-                        .height(48.dp)
+                        .height(46.dp)
                         .testTag("details_button_${entry.id}"),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = ButtonShape12
                 ) {
                     Text(
                         text = "বিস্তারিত",
@@ -320,7 +330,7 @@ fun VerificationStatusBadge(
     }
 
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = BadgeShape8,
         color = bgColor,
         modifier = modifier
     ) {
@@ -339,7 +349,8 @@ fun VerificationStatusBadge(
                 text = status.labelBn,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = contentColor
+                color = contentColor,
+                maxLines = 1
             )
         }
     }
@@ -359,13 +370,19 @@ fun UpazilaFilterRow(
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(Upazila.entries, key = { it.id }) { upazila ->
+        items(
+            items = Upazila.entries,
+            key = { it.id },
+            contentType = { "upazila_chip" }
+        ) { upazila ->
             val isSelected = selectedUpazila == upazila
             val count = upazilaCounts[upazila]
-            val labelText = if (count != null && count > 0) {
-                "${upazila.nameBn} (${BengaliSearchAndFormatUtils.toBengaliNumber(count)})"
-            } else {
-                upazila.nameBn
+            val labelText = remember(upazila, count) {
+                if (count != null && count > 0) {
+                    "${upazila.nameBn} (${BengaliSearchAndFormatUtils.toBengaliNumber(count)})"
+                } else {
+                    upazila.nameBn
+                }
             }
 
             FilterChip(
@@ -382,9 +399,7 @@ fun UpazilaFilterRow(
                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = CircleShape,
-                modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .testTag("upazila_chip_${upazila.id}")
+                modifier = Modifier.testTag("upazila_chip_${upazila.id}")
             )
         }
     }

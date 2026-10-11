@@ -71,7 +71,7 @@ class ExampleRobolectricTest {
         repository.ensureSeedDataPopulated(context)
 
         val allServices = repository.allServices.first()
-        assertTrue("Expected offline services to be populated", allServices.size >= 25)
+        assertTrue("Expected comprehensive offline services (80+)", allServices.size >= 80)
 
         val target = allServices.first { it.id == "hosp_jamalpur_250_general" }
         repository.toggleFavorite(target.id, target.isFavorite)
@@ -79,6 +79,14 @@ class ExampleRobolectricTest {
         val favorites = repository.favoriteServices.first()
         assertEquals(1, favorites.size)
         assertEquals("hosp_jamalpur_250_general", favorites.first().id)
+
+        // Verify Jamalpur Sadar colleges & govt offices are populated
+        assertTrue(allServices.any { it.id == "edu_ashek_mahmud_college" })
+        assertTrue(allServices.any { it.id == "edu_zaheda_safir_womens_college" })
+        assertTrue(allServices.any { it.id == "edu_nandina_sheikh_anwar_college" })
+        assertTrue(allServices.any { it.id == "edu_digpait_shamsul_haque_college" })
+        assertTrue(allServices.any { it.id == "govt_rhd_jamalpur" })
+        assertTrue(allServices.any { it.id == "govt_dphe_jamalpur" })
     }
 
     @Test
@@ -147,9 +155,13 @@ class ExampleRobolectricTest {
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("প্রিয় ও সংরক্ষিত সেবাসমূহ").assertIsDisplayed()
 
-        // Navigate to Settings tab
+        // Navigate to Settings tab and verify About developer credit
         composeTestRule.onNodeWithTag("nav_tab_settings").performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("সেটিংস, ডাটা আপডেট ও পরিচিতি").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("settings_screen_list")
+            .performScrollToNode(hasTestTag("developer_credit_box"))
+        composeTestRule.onNodeWithText("This app make by Elias Hossain").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Phone Number +8801889515106").assertIsDisplayed()
     }
 }
