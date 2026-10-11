@@ -71,8 +71,6 @@ object BengaliSearchAndFormatUtils {
 
     /**
      * ফোন নম্বরটি ডায়াল করার উপযোগী ও বৈধ কি না তা পরীক্ষা করে।
-     * ৩-৫ ডিজিটের জাতীয় হটলাইন (যেমন 999, 102, 131, 333, 1090, 16263, 16999)
-     * এবং ৮-১৫ ডিজিটের ল্যান্ডলাইন/মোবাইল নম্বর গ্রহণযোগ্য।
      */
     fun isValidPhoneNumber(rawPhone: String): Boolean {
         val normalized = normalizeDialNumber(rawPhone)
@@ -83,7 +81,7 @@ object BengaliSearchAndFormatUtils {
     }
 
     /**
-     * বাংলা ও ইংরেজি শব্দ, ফোন নম্বর, ক্যাটাগরি, উপজেলা ও ঠিকানার ভিত্তিতে সার্চ ম্যাচিং।
+     * প্রি-কমপিউটেড সার্চ স্ট্রিং ব্যবহার করে দ্রুতগতির বাংলা ও ইংরেজি সার্চ ম্যাচিং।
      */
     fun matchesSearchQuery(entry: ServiceEntry, rawQuery: String): Boolean {
         val trimmed = rawQuery.trim()
@@ -93,41 +91,18 @@ object BengaliSearchAndFormatUtils {
         val queryAscii = toAsciiDigits(queryLower)
         val queryNormPhone = normalizeDialNumber(trimmed)
 
-        val category = ServiceCategory.fromId(entry.categoryId)
-        val upazila = Upazila.fromId(entry.upazilaId)
-
-        // ফোন নম্বর ম্যাচিং (বাংলা বা ইংরেজি যেকোনো ডিজিট দিয়ে)
         if (queryNormPhone.isNotEmpty() && queryNormPhone.all { it.isDigit() || it == '+' }) {
-            val primaryNorm = normalizeDialNumber(entry.primaryPhone)
-            val secondaryNorm = normalizeDialNumber(entry.secondaryPhone)
-            if (primaryNorm.contains(queryNormPhone.removePrefix("+")) ||
-                secondaryNorm.contains(queryNormPhone.removePrefix("+"))
+            val cleanQueryDigits = queryNormPhone.removePrefix("+")
+            if (entry.normalizedPrimaryPhone.contains(cleanQueryDigits) ||
+                entry.normalizedSecondaryPhone.contains(cleanQueryDigits)
             ) {
                 return true
             }
         }
 
-        // টেক্সট ফিল্ডগুলোর সমন্বিত সার্চ স্ট্রিং
-        val searchableBlob = buildString {
-            append(entry.nameBn).append(' ')
-            append(entry.officialNameEn).append(' ')
-            append(category.titleBn).append(' ')
-            append(category.titleEn).append(' ')
-            append(upazila.nameBn).append(' ')
-            append(upazila.nameEn).append(' ')
-            append(entry.addressBn).append(' ')
-            append(entry.availableServicesBn).append(' ')
-            append(entry.searchKeywords).append(' ')
-            append(entry.primaryPhone).append(' ')
-            append(entry.secondaryPhone)
-        }.lowercase(Locale.ROOT)
-
-        val searchableBlobAscii = toAsciiDigits(searchableBlob)
-
-        // একাধিক শব্দের কুয়েরির জন্য প্রতিটি টোকেন পরীক্ষা করা হয়
         val tokens = queryAscii.split(Regex("\\s+")).filter { it.isNotEmpty() }
         return tokens.all { token ->
-            searchableBlob.contains(token) || searchableBlobAscii.contains(token)
+            entry.searchableBlob.contains(token) || entry.searchableBlobAscii.contains(token)
         }
     }
 
@@ -140,22 +115,18 @@ object BengaliSearchAndFormatUtils {
         selectedCategory: ServiceCategory = ServiceCategory.ALL,
         selectedUpazila: Upazila = Upazila.ALL
     ): List<ServiceEntry> {
+        val hasQuery = query.isNotBlank()
+        val filterByCategory = selectedCategory != ServiceCategory.ALL
+        val filterByUpazila = selectedUpazila != Upazila.ALL
+
+        if (!hasQuery && !filterByCategory && !filterByUpazila) {
+            return services
+        }
+
         return services.filter { entry ->
-            val categoryMatch = selectedCategory == ServiceCategory.ALL ||
-                entry.categoryId == selectedCategory.id
-            val upazilaMatch = when (selectedUpazila) {
-                Upazila.ALL -> true
-                Upazila.DISTRICT_WIDE -> entry.upazilaId == Upazila.DISTRICT_WIDE.id
-                else -> entry.upazilaId == selectedUpazila.id ||
-                    entry.upazilaId == Upazila.DISTRICT_WIDE.id && query.isNotBlank()
-            }
-            // যদি ব্যবহারকারী নির্দিষ্ট কোনো উপজেলা ফিল্টার নির্বাচন করেন এবং সার্চ খালি থাকে,
-            // তবে শুধুমাত্র সেই উপজেলার সেবা দেখাবে:
-            val strictUpazilaMatch = when (selectedUpazila) {
-                Upazila.ALL -> true
-                else -> entry.upazilaId == selectedUpazila.id
-            }
-            categoryMatch && strictUpazilaMatch && matchesSearchQuery(entry, query)
+            val categoryMatch = !filterByCategory || entry.categoryId == selectedCategory.id
+            val strictUpazilaMatch = !filterByUpazila || entry.upazilaId == selectedUpazila.id
+            categoryMatch && strictUpazilaMatch && (!hasQuery || matchesSearchQuery(entry, query))
         }
     }
 
@@ -179,13 +150,12 @@ object BengaliSearchAndFormatUtils {
     }
 
     fun formatDistanceBn(distanceKm: Double): String {
-        val formatted = if (distanceKm < 1.0) {
+        return if (distanceKm < 1.0) {
             val meters = (distanceKm * 1000).toInt().coerceAtLeast(50)
             "${toBengaliNumber(meters)} মিটার দূরে"
         } else {
             val rounded = String.format(Locale.US, "%.1f", distanceKm)
             "${toBengaliDigits(rounded)} কি.মি. দূরে"
         }
-        return formatted
     }
 }

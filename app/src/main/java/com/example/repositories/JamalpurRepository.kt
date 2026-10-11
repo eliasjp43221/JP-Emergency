@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * জামালপুর সেবা অ্যাপের কেন্দ্রীয় রিপোজিটরি (Repository Pattern)।
- * লোকাল Room ডাটাবেস, সিড ডাটা এবং JSON আপডেট ভ্যালিডেশন পরিচালনা করে।
+ * লোকাল Room ডাটাবেস এবং যাচাইকৃত সিড ডাটা পরিচালনা করে।
  */
 class JamalpurRepository(
     private val serviceDao: ServiceDao,
@@ -32,13 +32,25 @@ class JamalpurRepository(
     suspend fun getServiceById(id: String): ServiceEntry? = serviceDao.getServiceById(id)
 
     /**
-     * অ্যাপ চালুর সময় লোকাল ডাটাবেস খালি থাকলে যাচাইকৃত প্রাথমিক তথ্য সংরক্ষণ করে।
+     * অ্যাপ চালুর সময় যাচাইকৃত সকল তথ্য (নতুন যুক্ত কলেজ ও সরকারি সংস্থাসহ) ডাটাবেসে নিশ্চিত করে।
      */
     suspend fun ensureSeedDataPopulated(context: Context? = null) {
+        val seedServices = VerifiedJamalpurSeedData.cachedDefaultEntries
         val currentCount = serviceDao.getServiceCount()
-        if (currentCount == 0) {
-            val seedServices = VerifiedJamalpurSeedData.loadSeedServices(context)
-            serviceDao.upsertServices(seedServices)
+        if (currentCount < seedServices.size) {
+            val existing = serviceDao.getAllServicesSnapshot().associateBy { it.id }
+            val merged = seedServices.map { item ->
+                val prev = existing[item.id]
+                if (prev != null) {
+                    item.copy(
+                        isFavorite = prev.isFavorite,
+                        lastViewedTimestamp = prev.lastViewedTimestamp
+                    )
+                } else {
+                    item
+                }
+            }
+            serviceDao.upsertServices(merged)
         }
         val donorCount = bloodDonorDao.getDonorCount()
         if (donorCount == 0) {
@@ -59,9 +71,6 @@ class JamalpurRepository(
         return result
     }
 
-    /**
-     * ভার্সনযুক্ত JSON স্ট্রিং থেকে নতুন বা আপডেটকৃত সেবা তথ্য যাচাই ও ইমপোর্ট করে।
-     */
     suspend fun importServicesFromJson(jsonString: String): DataImportResult {
         val existing = serviceDao.getAllServicesSnapshot()
         val (validEntries, result) = DataValidator.parseAndValidateJson(jsonString, existing)
@@ -69,11 +78,6 @@ class JamalpurRepository(
             serviceDao.upsertServices(validEntries)
         }
         return result
-    }
-
-    suspend fun exportCurrentServicesJson(): String {
-        val existing = serviceDao.getAllServicesSnapshot()
-        return DataValidator.exportToJson(existing)
     }
 
     suspend fun toggleFavorite(serviceId: String, currentFavorite: Boolean) {

@@ -14,7 +14,7 @@ import com.example.models.ServiceEntry
         BloodDonorEntry::class,
         IssueReportEntry::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class JamalpurDatabase : RoomDatabase() {
